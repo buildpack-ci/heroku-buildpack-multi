@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+
+set -e
+
+unset GIT_DIR
+BUILDPACK_MULTI_PASS_IF_MISSING_TEST_SCRIPTS=${BUILDPACK_MULTI_PASS_IF_MISSING_TEST_SCRIPTS:=false}
+
+for BUILDPACK in $(cat $1/.buildpacks); do
+  dir=$(mktemp -t buildpackXXXXX)
+  rm -rf $dir
+
+  url=${BUILDPACK%#*}
+  branch=${BUILDPACK#*#}
+
+  if [ "$branch" == "$url" ]; then
+    branch=""
+  fi
+
+  if [ "$url" != "" ]; then
+    echo "=====> Downloading Buildpack: $url"
+
+    if [[ "$url" =~ \.tgz$ ]] || [[ "$url" =~ \.tgz\? ]]; then
+      mkdir -p "$dir"
+      curl -s "$url" | tar xvz -C "$dir" >/dev/null 2>&1
+    else
+      git clone $url $dir >/dev/null 2>&1
+    fi
+    cd $dir
+
+    if [ "$branch" != "" ]; then
+      git checkout $branch >/dev/null 2>&1
+    fi
+
+    # we'll get errors later if these are needed and don't exist
+    chmod -f +x $dir/bin/{test-compile,test} || true
+    framework=$($dir/bin/detect $1)
+
+    if [ $? == 0 ]; then
+      echo "=====> Detected Framework: $framework"
+      if [ -e $dir/bin/test-compile ]; then
+        $dir/bin/test-compile $1 $2 $3
+      elif ${BUILDPACK_MULTI_PASS_IF_MISSING_TEST_SCRIPTS}; then
+        echo "       Buildpack is missing test-compile script, skipping..."
+      else
+        echo "       Buildpack is missing test-compile script, aborting..."
+        exit 1
+      fi
+
+      # check if the buildpack left behind an environment for subsequent ones
+      if [ -e $dir/export ]; then
+        source $dir/export
+      fi
+
+      echo "=====> Running tests: $framework"
+      if [ -e $dir/bin/test ]; then
+        $dir/bin/test $1 $2 $3
+      elif ${BUILDPACK_MULTI_PASS_IF_MISSING_TEST_SCRIPTS}; then
+        echo "       Buildpack is missing test script, skipping..."
+      else
+        echo "       Buildpack is missing test script, aborting..."
+        exit 1
+      fi
+    else
+      echo "Couldn't detect any framework for this buildpack. Exiting."
+      exit 1
+    fi
+  fi
+done

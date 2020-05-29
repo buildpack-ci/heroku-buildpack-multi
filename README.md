@@ -34,6 +34,20 @@ You do this by writing a to `$buildpack_dir/export` where `$buildpack_dir` is th
 export "$PATH:\$PATH"
 ```
 
+## Buildpack Tests
+
+Using a buildpack to run application unit tests requires two scripts, `bin/test-compile` and `bin/test`, to exist in the buildpack.  The buildpacks that are known to work are as follows.
+
+1. https://github.com/heroku/heroku-buildpack-ruby
+1. https://github.com/heroku/heroku-buildpack-nodejs
+1. https://github.com/heroku/heroku-buildpack-go
+1. https://github.com/heroku/heroku-buildpack-scala
+1. https://github.com/heroku/heroku-buildpack-java
+1. https://github.com/buildpack-ci/null-buildpack
+1. https://github.com/vincetse/heroku-buildpack-python
+
+In the event that you need to use a buildpack that does not support running application unit tests, setting the environment variable `BUILDPACK_MULTI_PASS_IF_MISSING_TEST_SCRIPTS` to a value of `true` will skip over buildpacks that do not support unit tests.
+
 ## License
 
 BSD 3-Clause
